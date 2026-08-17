@@ -1,5 +1,6 @@
 import argparse
 import logging
+import re
 from pathlib import Path
 
 import chromadb
@@ -12,20 +13,10 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
 
 
-# =========================================================
-# Project paths
-# =========================================================
-
 BASE_DIR = Path(__file__).resolve().parent
 CHROMA_DIR = BASE_DIR / "chroma_db"
 
-
-# =========================================================
-# Configuration
-# =========================================================
-
 CHROMA_COLLECTION = "rag_pdf_documents_llama"
-
 EMBEDDING_MODEL_ID = "embeddinggemma"
 LLM_MODEL_ID = "llama3.2"
 OLLAMA_BASE_URL = "http://127.0.0.1:11434"
@@ -40,22 +31,12 @@ OLLAMA_ERROR_MESSAGE = (
     "Make sure Ollama is running and the configured models are installed."
 )
 
-
-# =========================================================
-# Logging
-# =========================================================
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
 )
-
 logger = logging.getLogger(__name__)
 
-
-# =========================================================
-# PDF loading
-# =========================================================
 
 def document_loader(file_path: str):
     """Load readable PDF pages into LangChain Documents."""
@@ -63,10 +44,8 @@ def document_loader(file_path: str):
 
     if not path.exists():
         raise FileNotFoundError(f"PDF file not found: {file_path}")
-
     if not path.is_file():
         raise ValueError(f"Path is not a file: {file_path}")
-
     if path.suffix.lower() != ".pdf":
         raise ValueError("Only PDF files are supported.")
 
@@ -77,10 +56,8 @@ def document_loader(file_path: str):
         raise ValueError("The PDF contains no pages.")
 
     documents = []
-
     for page_number, page in enumerate(reader.pages):
         text = page.extract_text() or ""
-
         if not text.strip():
             continue
 
@@ -103,10 +80,6 @@ def document_loader(file_path: str):
     return documents
 
 
-# =========================================================
-# Text splitting
-# =========================================================
-
 def text_splitter(documents):
     """Split PDF text into overlapping chunks."""
     if not documents:
@@ -117,7 +90,6 @@ def text_splitter(documents):
         chunk_overlap=CHUNK_OVERLAP,
         length_function=len,
     )
-
     chunks = splitter.split_documents(documents)
 
     if not chunks:
@@ -126,12 +98,7 @@ def text_splitter(documents):
     return chunks
 
 
-# =========================================================
-# Ollama models
-# =========================================================
-
 def ollama_embedding():
-    """Create the local Ollama embedding model."""
     return OllamaEmbeddings(
         model=EMBEDDING_MODEL_ID,
         base_url=OLLAMA_BASE_URL,
@@ -139,7 +106,6 @@ def ollama_embedding():
 
 
 def get_llm():
-    """Create the local Llama chat model through Ollama."""
     return ChatOllama(
         model=LLM_MODEL_ID,
         base_url=OLLAMA_BASE_URL,
@@ -148,14 +114,8 @@ def get_llm():
     )
 
 
-# =========================================================
-# Chroma client and vector database
-# =========================================================
-
 def create_chroma_client():
-    """Create the persistent local Chroma client."""
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-
     return chromadb.PersistentClient(
         path=str(CHROMA_DIR),
         settings=Settings(
@@ -165,20 +125,13 @@ def create_chroma_client():
     )
 
 
-def vector_database(
-    chunks,
-    batch_size=DEFAULT_BATCH_SIZE,
-    reset_db=True,
-):
-    """Embed document chunks locally and store them in Chroma."""
+def vector_database(chunks, batch_size=DEFAULT_BATCH_SIZE, reset_db=True):
     if not chunks:
         raise ValueError("No document chunks were provided.")
-
     if batch_size < 1:
         raise ValueError("Batch size must be at least 1.")
 
     client = create_chroma_client()
-
     if reset_db:
         logger.info("Resetting previous Llama Chroma database.")
         client.reset()
@@ -190,18 +143,15 @@ def vector_database(
     )
 
     total_chunks = len(chunks)
-
     for start in range(0, total_chunks, batch_size):
         end = min(start + batch_size, total_chunks)
         batch = chunks[start:end]
-
         logger.info(
             "Embedding chunks %s-%s of %s with Ollama.",
             start + 1,
             end,
             total_chunks,
         )
-
         try:
             vector_store.add_documents(batch)
         except Exception as error:
@@ -211,15 +161,9 @@ def vector_database(
     return vector_store
 
 
-# =========================================================
-# Retriever
-# =========================================================
-
 def retriever(vector_store, k=DEFAULT_RETRIEVAL_K):
-    """Create a similarity retriever from the Chroma vector store."""
     if vector_store is None:
         raise ValueError("A vector store must be provided.")
-
     if k < 1:
         raise ValueError("Retriever result count must be at least 1.")
 
@@ -229,12 +173,50 @@ def retriever(vector_store, k=DEFAULT_RETRIEVAL_K):
     )
 
 
-# =========================================================
-# Prompt
-# =========================================================
+def sanitize_retrieved_text(text: str) -> str:
+    """Remove obvious PDF extraction artifacts before LLM generation."""
+    cleaned_lines = []
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            cleaned_lines.append("")
+            continue
+
+        # Drop short, equation-like lines dominated by punctuation or isolated variables.
+        alnum_count = sum(char.isalnum() for char in line)
+        symbol_count = sum(
+            not char.isalnum() and not char.isspace()
+            for char in line
+        )
+        words = re.findall(r"[A-Za-z]{2,}", line)
+
+        equation_like = (
+            len(line) <= 80
+            and symbol_count >= 4
+            and len(words) <= 3
+        )
+
+        corrupted_formula_pattern = bool(
+            re.search(
+                r"(?:[A-Za-z]{1,2}\s*){4,}.*[=(),]",
+                line,
+            )
+        )
+
+        if equation_like or corrupted_formula_pattern:
+            continue
+
+        # Remove stray replacement/control characters sometimes produced by PDF extraction.
+        line = re.sub(r"[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffd]", "", line)
+
+        if alnum_count > 0:
+            cleaned_lines.append(line)
+
+    return "\n".join(cleaned_lines).strip()
+
 
 def build_rag_prompt():
-    """Build the grounded document Q&A prompt."""
     return ChatPromptTemplate.from_messages(
         [
             (
@@ -245,13 +227,7 @@ Answer the user's question using only the retrieved document context provided to
 Do not use outside knowledge.
 Do not invent, assume, or add information that is not supported by the supplied context.
 
-PDF text extraction can introduce malformed equations, broken symbols, misplaced characters, or formatting artifacts.
-
-IMPORTANT OUTPUT RULES:
-- Never reproduce mathematical equations, symbolic formulas, variable expressions, or corrupted notation from the retrieved PDF text.
-- Never output garbled strings of symbols or letters that appear to come from a damaged equation or layout.
-- If a formula or symbolic expression appears in the context, omit the notation entirely and explain only its meaning in plain English when the surrounding readable text supports that explanation.
-- Prefer clear natural-language descriptions over symbolic notation.
+The retrieved text may have been cleaned to remove malformed PDF equations and layout artifacts. Explain ideas in clear natural language and do not reconstruct missing formulas or corrupted notation.
 
 If the context does not contain enough information to answer the question, respond exactly with:
 
@@ -273,15 +249,9 @@ Question:
     )
 
 
-# =========================================================
-# RAG answer generation
-# =========================================================
-
 def rag_answer(document_retriever, query: str):
-    """Retrieve relevant chunks and answer with local Llama."""
     if document_retriever is None:
         raise ValueError("A document retriever must be provided.")
-
     if not query or not query.strip():
         raise ValueError("A question must be provided.")
 
@@ -299,11 +269,18 @@ def rag_answer(document_retriever, query: str):
         )
 
     context_sections = []
-
     for document in documents:
         page_number = document.metadata.get("page", 0) + 1
-        context_sections.append(
-            f"[Page {page_number}]\n{document.page_content}"
+        cleaned_text = sanitize_retrieved_text(document.page_content)
+        if cleaned_text:
+            context_sections.append(
+                f"[Page {page_number}]\n{cleaned_text}"
+            )
+
+    if not context_sections:
+        return (
+            "I could not find enough information in the document to answer that question.",
+            documents,
         )
 
     context = "\n\n".join(context_sections)
@@ -322,12 +299,7 @@ def rag_answer(document_retriever, query: str):
     return response.content, documents
 
 
-# =========================================================
-# Source formatting
-# =========================================================
-
 def format_sources(source_documents):
-    """Convert retrieved metadata into readable source citations."""
     sources = []
     seen_sources = set()
 
@@ -349,16 +321,7 @@ def format_sources(source_documents):
     return sources
 
 
-# =========================================================
-# Complete indexing workflow
-# =========================================================
-
-def index_pdf(
-    file_path: str,
-    batch_size=DEFAULT_BATCH_SIZE,
-    k=DEFAULT_RETRIEVAL_K,
-):
-    """Load, split, embed, index, and prepare a PDF retriever."""
+def index_pdf(file_path: str, batch_size=DEFAULT_BATCH_SIZE, k=DEFAULT_RETRIEVAL_K):
     path = Path(file_path)
 
     logger.info("Loading PDF: %s", path.name)
@@ -373,18 +336,12 @@ def index_pdf(
         batch_size=batch_size,
         reset_db=True,
     )
-
     document_retriever = retriever(vector_store, k=k)
 
     return document_retriever, len(documents), len(chunks)
 
 
-# =========================================================
-# Command-line test
-# =========================================================
-
 def run_pipeline_test(pdf_path: str, query: str):
-    """Run an end-to-end local test using a user-supplied PDF."""
     print("=" * 60)
     print("Local Llama/Ollama RAG Pipeline Test")
     print("=" * 60)
