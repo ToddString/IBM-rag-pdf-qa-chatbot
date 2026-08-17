@@ -245,11 +245,13 @@ Answer the user's question using only the retrieved document context provided to
 Do not use outside knowledge.
 Do not invent, assume, or add information that is not supported by the supplied context.
 
+PDF text extraction can introduce malformed equations, broken symbols, misplaced characters, or formatting artifacts. Ignore those artifacts when they are not clearly readable or necessary to answer the question. Do not reproduce garbled equations or corrupted text. Instead, explain the supported idea in clear natural language using the surrounding readable context.
+
 If the context does not contain enough information to answer the question, respond exactly with:
 
 I could not find enough information in the document to answer that question.
 
-Be clear, concise, and factual.""",
+Be clear, concise, factual, and readable.""",
             ),
             (
                 "human",
