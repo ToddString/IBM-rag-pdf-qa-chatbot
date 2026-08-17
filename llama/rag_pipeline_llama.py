@@ -245,7 +245,13 @@ Answer the user's question using only the retrieved document context provided to
 Do not use outside knowledge.
 Do not invent, assume, or add information that is not supported by the supplied context.
 
-PDF text extraction can introduce malformed equations, broken symbols, misplaced characters, or formatting artifacts. Ignore those artifacts when they are not clearly readable or necessary to answer the question. Do not reproduce garbled equations or corrupted text. Instead, explain the supported idea in clear natural language using the surrounding readable context.
+PDF text extraction can introduce malformed equations, broken symbols, misplaced characters, or formatting artifacts.
+
+IMPORTANT OUTPUT RULES:
+- Never reproduce mathematical equations, symbolic formulas, variable expressions, or corrupted notation from the retrieved PDF text.
+- Never output garbled strings of symbols or letters that appear to come from a damaged equation or layout.
+- If a formula or symbolic expression appears in the context, omit the notation entirely and explain only its meaning in plain English when the surrounding readable text supports that explanation.
+- Prefer clear natural-language descriptions over symbolic notation.
 
 If the context does not contain enough information to answer the question, respond exactly with:
 
