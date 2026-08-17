@@ -102,6 +102,12 @@ If the question is omitted, the default question is:
 What is this document about?
 ```
 
+## PDF Size and Wait Time
+
+The larger the PDF, the longer the user should expect to wait for processing and answers. Longer documents usually create more text chunks, so the application has more content to extract, embed, index, search, and process before generating a response.
+
+Processing speed also depends on the computer running Ollama. CPU, RAM, GPU availability, model loading time, and the complexity of the document can all affect how long indexing and answer generation take. A short PDF may process relatively quickly, while a large PDF can take several minutes or longer on slower hardware.
+
 ## RAG Workflow
 
 ```text
@@ -184,6 +190,7 @@ llama/
 - Scanned image-only PDFs are not OCR processed.
 - Only one PDF is indexed at a time.
 - Local model performance depends on available hardware.
+- Larger PDFs generally require longer processing and answer times.
 - Model responses can vary from the IBM Granite implementation.
 
 ## Development Status
