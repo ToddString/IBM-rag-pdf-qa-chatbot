@@ -1,47 +1,78 @@
 # Retrieval-Augmented Generation (RAG) PDF Question Answering Chatbot
 
-A portfolio-ready PDF question-answering application built with **Retrieval-Augmented Generation (RAG)**. Users can upload a PDF, index its contents, and ask grounded questions whose answers are generated from retrieved document context.
+A portfolio project that demonstrates two implementations of the same PDF question-answering workflow:
 
-The application uses **IBM watsonx.ai** for embeddings and answer generation, **LangChain** for orchestration, **Chroma** for vector storage and similarity search, **pypdf** for PDF text extraction, and **Gradio** for the user interface.
+- **IBM watsonx.ai + IBM Granite** for cloud-hosted embeddings and answer generation
+- **Meta Llama + Ollama** for fully local embeddings and answer generation
+
+Both versions use **LangChain**, **Chroma**, **pypdf**, and **Gradio** to extract PDF text, split it into chunks, retrieve relevant passages, generate grounded answers, and display the source pages used for each response.
+
+> **AI Accuracy Disclaimer:** The IBM Granite and Meta Llama models used by this project can make mistakes, misinterpret retrieved passages, omit important context, or generate inaccurate information. Retrieval-Augmented Generation reduces but does not eliminate these risks. Always verify important answers against the cited PDF pages and original source document, especially before relying on the output for medical, legal, financial, academic, safety-critical, or other high-stakes decisions.
 
 ## Features
 
-- Upload PDF documents through a Gradio interface
-- Extract readable text from PDF pages with pypdf
-- Split document text into overlapping chunks
-- Generate embeddings with IBM watsonx.ai
-- Store document embeddings in a persistent Chroma vector database
-- Retrieve relevant passages using semantic similarity
-- Generate grounded answers with an IBM Granite chat model
+- Upload and index readable PDF documents
+- Extract text with pypdf
+- Split text into overlapping chunks
+- Store vector embeddings in Chroma
+- Retrieve relevant passages with semantic similarity search
+- Generate answers grounded only in retrieved PDF context
 - Display source pages used for each answer
 - Replace the previously indexed PDF when a new document is indexed
+- Clear chat history without removing the indexed document
+- Reset the application state
 - Disable conflicting controls during indexing and answer generation
 - Serialize resource-intensive RAG operations to avoid race conditions
-- Handle IBM watsonx.ai token quota errors gracefully
-- Clear chat history without removing the indexed document
-- Reset the complete application state
+- Provide user-friendly error handling
 
-## Technology Stack
+The local Llama implementation also includes query-aware retrieval for broad questions such as document summaries, purpose, overview, and main topic. For those questions it expands retrieval and prioritizes introductory context so smaller local models receive high-value passages from the beginning of the document.
 
-- Python 3.11
-- IBM watsonx.ai
-- IBM Granite models
-- LangChain
-- Chroma
-- Gradio
-- pypdf
-- python-dotenv
+## Implementations
 
-## Models
+### IBM watsonx.ai version
 
-The project currently uses:
+Repository root:
 
-- **Embedding model:** `ibm/granite-embedding-278m-multilingual`
-- **Chat model:** `ibm/granite-4-h-small`
+```text
+app.py
+rag_pipeline.py
+requirements.txt
+.env.example
+```
 
-## How It Works
+Models:
 
-The application follows this RAG workflow:
+```text
+Embedding: ibm/granite-embedding-278m-multilingual
+Chat:      ibm/granite-4-h-small
+```
+
+This version requires an IBM watsonx.ai project, IBM Cloud API key, and project ID.
+
+### Local Llama + Ollama version
+
+Directory:
+
+```text
+llama/
+├── app_llama.py
+├── rag_pipeline_llama.py
+├── requirements-llama.txt
+└── README.md
+```
+
+Models:
+
+```text
+Embedding: embeddinggemma
+Chat:      llama3.2
+```
+
+This version runs through a local Ollama service and does not require IBM Cloud credentials. See [`llama/README.md`](llama/README.md) for installation, GPU troubleshooting, and local execution details.
+
+## RAG Workflow
+
+Both implementations follow the same core architecture:
 
 ```text
 PDF Upload
@@ -53,7 +84,7 @@ PDF Text Extraction
 Text Chunking
     |
     v
-IBM watsonx.ai Embeddings
+Vector Embeddings
     |
     v
 Chroma Vector Database
@@ -62,25 +93,14 @@ Chroma Vector Database
 Semantic Retrieval
     |
     v
-Relevant Document Context
+Relevant PDF Context
     |
     v
-IBM Granite Chat Model
+LLM Answer Generation
     |
     v
 Grounded Answer + Source Pages
 ```
-
-When a user uploads and indexes a PDF:
-
-1. pypdf extracts text from readable PDF pages.
-2. LangChain splits the extracted text into overlapping chunks.
-3. IBM watsonx.ai generates vector embeddings for the chunks.
-4. Chroma stores the embeddings and document metadata.
-5. A LangChain retriever performs similarity search when the user asks a question.
-6. The most relevant document chunks are passed to the IBM Granite chat model.
-7. The model generates an answer using only the retrieved document context.
-8. The application displays the source pages associated with the retrieved chunks.
 
 ## Project Structure
 
@@ -92,29 +112,41 @@ rag-pdf-qa-chatbot/
 ├── README.md
 ├── .env.example
 ├── .gitignore
-├── sample_docs/
+├── llama/
+│   ├── app_llama.py
+│   ├── rag_pipeline_llama.py
+│   ├── requirements-llama.txt
+│   └── README.md
 ├── screenshots/
-│   ├── app-home.png
-│   ├── pdf-indexed.png
-│   └── question-answer.png
 └── tests/
     └── README.md
 ```
 
-Generated and sensitive files such as `.env`, `.venv`, `chroma_db`, and Python cache files are excluded through `.gitignore`.
+No third-party sample PDF is bundled with the repository. Test PDFs should remain local and are ignored through `.gitignore` when placed under `sample_docs/`.
 
-## Installation
+## Requirements
 
-### 1. Clone the repository
+- Python 3.11
+- A readable text-based PDF
+- Chroma
+- LangChain
+- Gradio
+- pypdf
+
+For the IBM version, you also need access to IBM watsonx.ai.
+
+For the local version, you also need Ollama with the configured models downloaded.
+
+## Clone the Repository
 
 ```bash
 git clone https://github.com/ToddString/IBM-rag-pdf-qa-chatbot.git
 cd IBM-rag-pdf-qa-chatbot
 ```
 
-### 2. Create a virtual environment
+## IBM watsonx.ai Installation
 
-Linux, WSL, or macOS:
+Create and activate a virtual environment:
 
 ```bash
 python3 -m venv .venv
@@ -128,15 +160,11 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 ```
 
-### 3. Install dependencies
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
-
-## IBM watsonx.ai Configuration
-
-This application requires access to an IBM watsonx.ai project and an IBM Cloud API key.
 
 Copy the example environment file:
 
@@ -144,7 +172,7 @@ Copy the example environment file:
 cp .env.example .env
 ```
 
-Then edit `.env`:
+Configure:
 
 ```env
 WATSONX_APIKEY=your_ibm_cloud_api_key
@@ -152,146 +180,168 @@ WATSONX_PROJECT_ID=your_watsonx_project_id
 WATSONX_URL=https://us-south.ml.cloud.ibm.com
 ```
 
-> **Security:** Do not commit your real `.env` file or IBM Cloud API key to GitHub.
+Do not commit the real `.env` file or IBM Cloud credentials.
 
-## Running the Pipeline Test
-
-A command-line end-to-end test is included in `rag_pipeline.py`.
-
-Run:
-
-```bash
-python rag_pipeline.py
-```
-
-The test:
-
-- loads the sample PDF
-- extracts readable pages
-- creates text chunks
-- generates embeddings
-- indexes the chunks in Chroma
-- performs semantic retrieval
-- generates a grounded answer
-- displays retrieved source pages
-
-Example output:
-
-```text
-============================================================
-RAG PDF QA Chatbot - Pipeline Test
-============================================================
-
-Readable pages: 11
-Chunks indexed: 38
-
-QUESTION
-What is Low-Rank Adaptation?
-
-GENERATED ANSWER
-...
-
-RETRIEVED SOURCES
-Source 1: test.pdf (page 2)
-Source 2: test.pdf (page 10)
-Source 3: test.pdf (page 1)
-```
-
-## Running the Gradio Application
-
-Start the application:
+Run the Gradio application:
 
 ```bash
 python app.py
 ```
 
-Then open:
+Then open the local URL shown by Gradio, normally:
 
 ```text
 http://127.0.0.1:7860
 ```
 
-## Using the Application
+## Local Llama + Ollama Installation
 
-1. Upload a PDF document.
-2. Click **Index PDF**.
-3. Wait for indexing to finish.
-4. Enter a question about the document.
-5. Click **Ask** or press Enter.
-6. Review the generated answer and source pages.
+Install and run Ollama, then download the configured models:
+
+```bash
+ollama pull llama3.2
+ollama pull embeddinggemma
+```
+
+Create a virtual environment and install the local dependencies:
+
+```bash
+python3 -m venv .venv-llama
+source .venv-llama/bin/activate
+pip install -r llama/requirements-llama.txt
+```
+
+Run the local Gradio application:
+
+```bash
+python llama/app_llama.py
+```
+
+Run the local command-line pipeline with your own PDF:
+
+```bash
+python llama/rag_pipeline_llama.py /path/to/document.pdf "What is this document about?"
+```
+
+For GPU verification and Ollama troubleshooting, see [`llama/README.md`](llama/README.md).
+
+## Using the Applications
+
+1. Launch either the IBM or local Llama Gradio application.
+2. Upload a readable PDF.
+3. Click **Index PDF**.
+4. Wait for indexing to complete.
+5. Enter a question about the document.
+6. Click **Ask** or press Enter.
+7. Review the generated answer and listed source pages.
 
 A newly indexed PDF replaces the previously indexed document.
 
-## Screenshots
+## Local Llama Broad-Question Retrieval
 
-### Application Interface
+The Llama implementation distinguishes between specific questions and broad document questions.
 
-![Application interface](screenshots/app-home.png)
+Specific questions use the normal similarity retriever.
 
-### PDF Successfully Indexed
+Broad questions containing terms such as `summarize`, `purpose`, `overview`, `main topic`, or equivalent document-level phrasing trigger expanded retrieval. The pipeline combines:
 
-![PDF indexed](screenshots/pdf-indexed.png)
+- introductory-page retrieval
+- the original user query
+- an overview-oriented retrieval query
 
-### Question Answering with Sources
+The retrieved chunks are deduplicated and introductory context is placed first before generation. This improves answers to questions such as:
 
-![Question answering with sources](screenshots/question-answer.png)
+```text
+What is the purpose of this PDF?
+Summarize this article.
+What is this document about?
+```
 
 ## Error Handling
 
-The application includes user-friendly handling for common failure conditions, including:
+The IBM implementation handles common failures including:
 
 - missing PDF files
 - unsupported file types
-- PDFs containing no readable text
-- missing IBM watsonx.ai environment variables
+- PDFs with no readable text
+- missing watsonx.ai environment variables
 - IBM API failures
-- IBM watsonx.ai token quota exhaustion
-- attempts to ask questions before a PDF is indexed
+- IBM token quota exhaustion
+- questions submitted before indexing
 - blank questions
 
-If IBM watsonx.ai reports that the available token quota has been reached, the Gradio interface displays a specific quota warning instead of exposing the full API traceback to the user.
+The local implementation handles similar input and state errors and also reports a friendly message when Ollama is unavailable or a configured local model is missing.
 
-Technical error details are still written to the terminal for troubleshooting.
+Technical details remain available in terminal logs for troubleshooting.
 
 ## Concurrency and Application State
 
 Indexing and answer generation are serialized through the Gradio event queue.
 
-Interactive controls are temporarily disabled while resource-intensive RAG operations are running. This prevents conflicting actions such as asking a question while a document is still being indexed or resetting the application during an active request.
+Interactive controls are disabled while resource-intensive RAG operations run. This prevents conflicting actions such as asking a question while indexing is still in progress or resetting the application during an active request.
 
 ## Vector Database Behavior
 
-Chroma is configured as a persistent local vector database.
+Each implementation uses its own persistent Chroma database directory.
 
-When a new document is indexed, the previous vector database contents are safely reset before the new document is stored. The application currently operates as a single-document question-answering system rather than a multi-document knowledge base.
+When a new document is indexed, the existing contents for that implementation are reset before the new document is stored. The project therefore operates as a single-document question-answering system rather than a multi-document knowledge base.
 
-The local Chroma database directory is excluded from Git.
+Chroma database files are excluded from Git.
 
-## Retrieval Configuration
+## Retrieval Defaults
 
-Current defaults:
+Core defaults include:
 
-- **Chunk size:** 1000 characters
-- **Chunk overlap:** 200 characters
-- **Embedding batch size:** 8 chunks
-- **Retrieved chunks per question:** 3
+```text
+Chunk size:          1000 characters
+Chunk overlap:       200 characters
+Embedding batch:     8 chunks
+Specific retrieval:  3 chunks
+```
 
-These settings can be changed in `rag_pipeline.py`.
+The Llama version expands retrieval to six deduplicated chunks for broad document-level questions.
+
+## Privacy and Deployment Characteristics
+
+### IBM watsonx.ai
+
+PDF content used for embeddings and generation is sent to the configured IBM watsonx.ai service. This implementation demonstrates cloud AI integration and requires valid IBM credentials and available service quota.
+
+### Local Llama + Ollama
+
+When Ollama is running locally, PDF text, embeddings, retrieval, and answer generation remain on the local machine. Performance depends on available CPU, RAM, GPU resources, model loading time, and PDF size.
+
+## Screenshots
+
+### IBM Application Interface
+
+![Application interface](screenshots/app-home.png)
+
+### IBM PDF Indexed
+
+![PDF indexed](screenshots/pdf-indexed.png)
+
+### IBM Question Answering with Sources
+
+![Question answering with sources](screenshots/question-answer.png)
+
+Additional screenshots for the local implementation can be added under `screenshots/llama/`.
 
 ## Security
 
-The project uses environment variables for IBM watsonx.ai credentials.
+Never commit credentials, virtual environments, vector databases, or test documents containing sensitive information.
 
-The following files and directories should never be committed:
+Important ignored paths include:
 
 ```text
 .env
 .venv/
+venv/
+env/
 chroma_db/
+sample_docs/*.pdf
 __pycache__/
 ```
-
-The included `.env.example` contains placeholders only.
 
 Before publishing changes, verify ignored files with:
 
@@ -301,16 +351,19 @@ git status --short --ignored
 
 ## Current Limitations
 
-- PDF files must contain extractable text
+- PDFs must contain extractable text
 - Scanned image-only PDFs are not OCR processed
-- Only one PDF is indexed at a time
-- Large PDFs may consume significant IBM watsonx.ai token usage
-- Answer quality depends on retrieval quality and the contents of the source document
-- The application is currently intended for local use and portfolio demonstration
+- Only one PDF is indexed at a time per implementation
+- Answer quality depends on retrieval quality and document content
+- AI-generated answers can still be inaccurate even when source passages are retrieved
+- Large PDFs require more indexing time and compute
+- IBM usage depends on service availability and token quota
+- Local Llama performance depends heavily on available hardware and whether Ollama uses CPU or GPU acceleration
+- Local model responses can differ from IBM Granite responses
 
 ## Dependencies
 
-The tested environment uses:
+IBM implementation:
 
 ```text
 chromadb==1.5.9
@@ -324,11 +377,31 @@ pypdf==6.16.1
 python-dotenv==1.2.2
 ```
 
+Local Llama implementation:
+
+```text
+chromadb==1.5.9
+gradio==6.24.0
+langchain-chroma==1.1.0
+langchain-core==1.5.5
+langchain-ollama==1.1.0
+langchain-text-splitters==1.1.2
+pypdf==6.16.1
+```
+
 ## Project Background
 
-This project began as an **IBM Skills Network learning exercise** covering document loading, text splitting, embeddings, vector databases, retrieval, large language models, and Gradio.
+This project began as an IBM Skills Network learning exercise covering document loading, text splitting, embeddings, vector databases, retrieval, language models, and Gradio.
 
-The original course implementation was rebuilt and expanded into this standalone portfolio project with updated IBM watsonx.ai and LangChain integrations, modern Chroma usage, persistent vector storage, batched embeddings, source-page reporting, application-state management, concurrency protection, improved error handling, and a redesigned Gradio interface.
+The IBM version was rebuilt and expanded into a standalone portfolio implementation with updated watsonx.ai and LangChain integrations, modern Chroma usage, persistent vector storage, batched embeddings, source-page reporting, application-state management, concurrency protection, improved error handling, and a redesigned Gradio interface.
+
+A second implementation was then added using Meta Llama and Ollama to demonstrate the same RAG architecture with a local model backend, local embeddings, hardware-aware execution, PDF text sanitization, and query-aware retrieval for broad document questions.
+
+## Testing
+
+Manual end-to-end validation is documented in [`tests/README.md`](tests/README.md).
+
+The project does not currently include an automated unit or integration test suite.
 
 ## License
 
@@ -342,3 +415,4 @@ B.S. Information Technology
 Digital Forensics Concentration  
 Minor in Computer Information Systems  
 University of South Alabama
+
