@@ -237,7 +237,7 @@ with gr.Blocks(title=APP_TITLE) as demo:
 
         with gr.Column(scale=2):
             gr.Markdown("## Ask Questions")
-            chatbot = gr.Chatbot(label="Document Q&A", height=500)
+            chatbot = gr.Chatbot(label="Document Q&A", height=325)
             question_input = gr.Textbox(
                 label="Question",
                 placeholder="Index a PDF before asking a question...",
