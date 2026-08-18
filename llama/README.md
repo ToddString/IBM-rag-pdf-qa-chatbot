@@ -108,6 +108,94 @@ The larger the PDF, the longer the user should expect to wait for processing and
 
 Processing speed also depends on the computer running Ollama. CPU, RAM, GPU availability, model loading time, and the complexity of the document can all affect how long indexing and answer generation take. A short PDF may process relatively quickly, while a large PDF can take several minutes or longer on slower hardware.
 
+## CPU vs GPU Performance and Ollama Troubleshooting
+
+Ollama can run the Llama and embedding models on the CPU or, when supported and detected correctly, on a GPU. CPU-only execution can be significantly slower for RAG workloads because PDF indexing may require many embedding requests and answer generation must also run through the local model.
+
+Check where the currently loaded model is running with:
+
+```bash
+ollama ps
+```
+
+The `PROCESSOR` column is the important field. For example:
+
+```text
+100% CPU
+```
+
+means the model is running entirely on the CPU, while:
+
+```text
+100% GPU
+```
+
+means the model is fully loaded on the GPU. A CPU/GPU split means Ollama has offloaded only part of the model to the GPU.
+
+On systems with an NVIDIA GPU, verify that the operating system can see the GPU:
+
+```bash
+nvidia-smi
+```
+
+If `nvidia-smi` detects the GPU but `ollama ps` still reports `100% CPU`, check the Ollama service log:
+
+```bash
+journalctl -u ollama --no-pager -n 100
+```
+
+Messages such as `inference compute id=cpu`, `offloaded 0/... layers to GPU`, or `total vram="0 B"` indicate that Ollama did not successfully detect a usable GPU and has fallen back to CPU execution.
+
+### Fix Used During Development on Debian/WSL2
+
+During development, WSL2 could see the NVIDIA GPU through `nvidia-smi`, but an older Ollama installation still reported `100% CPU` and `0 B` of VRAM. Updating Ollama resolved GPU detection.
+
+On Debian/Ubuntu, install `zstd` first if the current Ollama installer requires it:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y zstd
+```
+
+Then update/reinstall Ollama using the official installer:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+Restart the Ollama service:
+
+```bash
+sudo systemctl restart ollama
+```
+
+Run a quick model test:
+
+```bash
+ollama run llama3.2 "Reply with exactly: OK"
+```
+
+Then verify GPU use:
+
+```bash
+ollama ps
+```
+
+A successful fix should show the loaded model using the GPU, for example:
+
+```text
+PROCESSOR
+100% GPU
+```
+
+You can also confirm active GPU memory and utilization with:
+
+```bash
+nvidia-smi
+```
+
+Do not assume that a long wait is caused by PDF size alone. If indexing finishes but answer generation is unexpectedly slow, check `ollama ps` and the Ollama logs to confirm whether the model is actually using the GPU.
+
 ## RAG Workflow
 
 ```text
@@ -190,6 +278,7 @@ llama/
 - Scanned image-only PDFs are not OCR processed.
 - Only one PDF is indexed at a time.
 - Local model performance depends on available hardware.
+- CPU-only Ollama execution can be substantially slower than GPU-accelerated execution.
 - Larger PDFs generally require longer processing and answer times.
 - Model responses can vary from the IBM Granite implementation.
 
