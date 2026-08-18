@@ -319,7 +319,7 @@ def build_rag_prompt(broad_query=False):
     if broad_query:
         broad_guidance = """
 
-For broad questions about the document's purpose, topic, overview, or summary, synthesize the answer from the title, abstract, introduction, discussion, conclusions, and stated contributions present in the supplied context. The context does not need to contain the exact word \"purpose\". You may state the document's purpose when it is directly supported by those passages. Prefer answering from supported high-level evidence rather than returning the insufficient-information message when the supplied context clearly describes what the work introduces, studies, evaluates, reviews, or aims to accomplish."""
+For broad questions about the document's purpose, topic, overview, or summary, synthesize the answer from the title, abstract, introduction, discussion, conclusions, and stated contributions present in the supplied context. The context does not need to contain the exact word \"purpose\". When the supplied context clearly identifies what the document introduces, studies, reviews, evaluates, or aims to accomplish, answer directly and confidently from that evidence. Avoid hedging phrases such as \"appears to be\", \"seems to be\", or \"probably\" unless the context itself is genuinely ambiguous. If asked for the purpose, begin with a direct statement such as \"The purpose of this article is to...\" or \"The purpose of this document is to...\" and then briefly explain the main approach or contribution. Prefer supported high-level synthesis over returning the insufficient-information message when the supplied context clearly provides the document's framing and objectives."""
 
     return ChatPromptTemplate.from_messages(
         [
