@@ -405,12 +405,7 @@ The project does not currently include an automated unit or integration test sui
 
 ## License
 
-No license has been selected yet.
-
-
-Before redistributing third-party documents, verify that their licenses permit inclusion. No third-party sample PDF is bundled with this repository.
-
-Before redistributing third-party sample documents, verify that their licenses permit inclusion in this repository.
+No license has been selected yet. Before redistributing third-party documents, verify that their licenses permit inclusion. No third-party sample PDF is bundled with this repository.
 
 ## Author
 
