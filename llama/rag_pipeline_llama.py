@@ -25,6 +25,13 @@ CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 200
 DEFAULT_BATCH_SIZE = 8
 DEFAULT_RETRIEVAL_K = 3
+BROAD_RETRIEVAL_K = 6
+BROAD_PRIMARY_K = 4
+BROAD_OVERVIEW_K = 4
+BROAD_OVERVIEW_QUERY = (
+    "abstract introduction purpose objective overview main topic main subject "
+    "summary conclusions"
+)
 
 OLLAMA_ERROR_MESSAGE = (
     "Unable to connect to the local Ollama service or required model. "
@@ -173,6 +180,79 @@ def retriever(vector_store, k=DEFAULT_RETRIEVAL_K):
     )
 
 
+def is_broad_document_query(query: str) -> bool:
+    """Return True for summary, purpose, overview, and main-topic questions."""
+    normalized = " ".join(query.lower().split())
+    broad_markers = (
+        "summarize",
+        "summary",
+        "purpose",
+        "what is this document about",
+        "what is this pdf about",
+        "what is this article about",
+        "what is the document about",
+        "what is the pdf about",
+        "what is the article about",
+        "main topic",
+        "main subject",
+        "overall topic",
+        "overview",
+    )
+    return any(marker in normalized for marker in broad_markers)
+
+
+def _document_key(document: Document):
+    """Create a stable key for deduplicating retrieved chunks."""
+    return (
+        document.metadata.get("source"),
+        document.metadata.get("page"),
+        document.page_content,
+    )
+
+
+def retrieve_documents(document_retriever, query: str):
+    """Use broader query-aware retrieval for whole-document questions."""
+    if not is_broad_document_query(query):
+        return document_retriever.invoke(query)
+
+    vector_store = getattr(document_retriever, "vectorstore", None)
+    if vector_store is None:
+        logger.info(
+            "Broad question detected, but vector store access is unavailable; "
+            "using the configured retriever."
+        )
+        return document_retriever.invoke(query)
+
+    logger.info(
+        "Broad document question detected. Expanding retrieval to %s chunks.",
+        BROAD_RETRIEVAL_K,
+    )
+
+    # Use the user's wording for relevance, plus a second overview-oriented search
+    # that tends to surface abstracts, introductions, objectives, and conclusions.
+    primary_documents = vector_store.similarity_search(query, k=BROAD_PRIMARY_K)
+    overview_documents = vector_store.similarity_search(
+        BROAD_OVERVIEW_QUERY,
+        k=BROAD_OVERVIEW_K,
+    )
+
+    combined_documents = []
+    seen_documents = set()
+
+    for document in primary_documents + overview_documents:
+        key = _document_key(document)
+        if key in seen_documents:
+            continue
+
+        seen_documents.add(key)
+        combined_documents.append(document)
+
+        if len(combined_documents) >= BROAD_RETRIEVAL_K:
+            break
+
+    return combined_documents
+
+
 def sanitize_retrieved_text(text: str) -> str:
     """Remove obvious PDF extraction artifacts before LLM generation."""
     cleaned_lines = []
@@ -197,18 +277,15 @@ def sanitize_retrieved_text(text: str) -> str:
             and len(words) <= 3
         )
 
-        corrupted_formula_pattern = bool(
-            re.search(
-                r"(?:[A-Za-z]{1,2}\s*){4,}.*[=(),]",
-                line,
-            )
-        )
-
-        if equation_like or corrupted_formula_pattern:
+        if equation_like:
             continue
 
         # Remove stray replacement/control characters sometimes produced by PDF extraction.
-        line = re.sub(r"[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffd]", "", line)
+        line = re.sub(
+            r"[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffd]",
+            "",
+            line,
+        )
 
         if alnum_count > 0:
             cleaned_lines.append(line)
@@ -258,7 +335,7 @@ def rag_answer(document_retriever, query: str):
     query = query.strip()
 
     try:
-        documents = document_retriever.invoke(query)
+        documents = retrieve_documents(document_retriever, query)
     except Exception as error:
         raise RuntimeError(OLLAMA_ERROR_MESSAGE) from error
 
