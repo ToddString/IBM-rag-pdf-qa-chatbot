@@ -26,11 +26,16 @@ CHUNK_OVERLAP = 200
 DEFAULT_BATCH_SIZE = 8
 DEFAULT_RETRIEVAL_K = 3
 BROAD_RETRIEVAL_K = 6
-BROAD_PRIMARY_K = 4
-BROAD_OVERVIEW_K = 4
+BROAD_PRIMARY_K = 3
+BROAD_OVERVIEW_K = 3
+BROAD_INTRO_K = 2
 BROAD_OVERVIEW_QUERY = (
     "abstract introduction purpose objective overview main topic main subject "
-    "summary conclusions"
+    "summary conclusions discussion contributions"
+)
+BROAD_INTRO_QUERY = (
+    "title abstract introduction purpose objective research problem main contribution "
+    "what this paper presents and why"
 )
 
 OLLAMA_ERROR_MESSAGE = (
@@ -224,13 +229,27 @@ def retrieve_documents(document_retriever, query: str):
         return document_retriever.invoke(query)
 
     logger.info(
-        "Broad document question detected. Expanding retrieval to %s chunks.",
+        "Broad document question detected. Expanding retrieval to %s chunks and "
+        "prioritizing introductory context.",
         BROAD_RETRIEVAL_K,
     )
 
-    # Use the user's wording for relevance, plus a second overview-oriented search
-    # that tends to surface abstracts, introductions, objectives, and conclusions.
-    primary_documents = vector_store.similarity_search(query, k=BROAD_PRIMARY_K)
+    # Explicitly retrieve from the first two PDF pages so broad questions have
+    # access to title, abstract, introduction, objectives, and stated contributions.
+    intro_documents = []
+    for page_number in (0, 1):
+        intro_documents.extend(
+            vector_store.similarity_search(
+                BROAD_INTRO_QUERY,
+                k=BROAD_INTRO_K,
+                filter={"page": page_number},
+            )
+        )
+
+    primary_documents = vector_store.similarity_search(
+        query,
+        k=BROAD_PRIMARY_K,
+    )
     overview_documents = vector_store.similarity_search(
         BROAD_OVERVIEW_QUERY,
         k=BROAD_OVERVIEW_K,
@@ -239,7 +258,9 @@ def retrieve_documents(document_retriever, query: str):
     combined_documents = []
     seen_documents = set()
 
-    for document in primary_documents + overview_documents:
+    # Put introductory passages first so smaller local models see the most useful
+    # whole-document framing before more specialized passages.
+    for document in intro_documents + primary_documents + overview_documents:
         key = _document_key(document)
         if key in seen_documents:
             continue
@@ -293,18 +314,24 @@ def sanitize_retrieved_text(text: str) -> str:
     return "\n".join(cleaned_lines).strip()
 
 
-def build_rag_prompt():
+def build_rag_prompt(broad_query=False):
+    broad_guidance = ""
+    if broad_query:
+        broad_guidance = """
+
+For broad questions about the document's purpose, topic, overview, or summary, synthesize the answer from the title, abstract, introduction, discussion, conclusions, and stated contributions present in the supplied context. The context does not need to contain the exact word \"purpose\". You may state the document's purpose when it is directly supported by those passages. Prefer answering from supported high-level evidence rather than returning the insufficient-information message when the supplied context clearly describes what the work introduces, studies, evaluates, reviews, or aims to accomplish."""
+
     return ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                """You are a document question-answering assistant.
+                f"""You are a document question-answering assistant.
 
 Answer the user's question using only the retrieved document context provided to you.
 Do not use outside knowledge.
 Do not invent, assume, or add information that is not supported by the supplied context.
 
-The retrieved text may have been cleaned to remove malformed PDF equations and layout artifacts. Explain ideas in clear natural language and do not reconstruct missing formulas or corrupted notation.
+The retrieved text may have been cleaned to remove malformed PDF equations and layout artifacts. Explain ideas in clear natural language and do not reconstruct missing formulas or corrupted notation.{broad_guidance}
 
 If the context does not contain enough information to answer the question, respond exactly with:
 
@@ -333,6 +360,7 @@ def rag_answer(document_retriever, query: str):
         raise ValueError("A question must be provided.")
 
     query = query.strip()
+    broad_query = is_broad_document_query(query)
 
     try:
         documents = retrieve_documents(document_retriever, query)
@@ -361,7 +389,7 @@ def rag_answer(document_retriever, query: str):
         )
 
     context = "\n\n".join(context_sections)
-    chain = build_rag_prompt() | get_llm()
+    chain = build_rag_prompt(broad_query=broad_query) | get_llm()
 
     try:
         response = chain.invoke(
