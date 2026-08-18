@@ -335,3 +335,12 @@ The original course implementation was rebuilt and expanded into this standalone
 No license has been selected yet.
 
 Before redistributing third-party sample documents, verify that their licenses permit inclusion in this repository.
+
+## Author
+
+**Todd Stringfellow**
+
+B.S. Information Technology  
+Digital Forensics Concentration  
+Minor in Computer Information Systems  
+University of South Alabama
