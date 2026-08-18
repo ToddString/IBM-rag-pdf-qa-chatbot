@@ -7,6 +7,8 @@ A portfolio project that demonstrates two implementations of the same PDF questi
 
 Both versions use **LangChain**, **Chroma**, **pypdf**, and **Gradio** to extract PDF text, split it into chunks, retrieve relevant passages, generate grounded answers, and display the source pages used for each response.
 
+> **AI Accuracy Disclaimer:** The IBM Granite and Meta Llama models used by this project can make mistakes, misinterpret retrieved passages, omit important context, or generate inaccurate information. Retrieval-Augmented Generation reduces but does not eliminate these risks. Always verify important answers against the cited PDF pages and original source document, especially before relying on the output for medical, legal, financial, academic, safety-critical, or other high-stakes decisions.
+
 ## Features
 
 - Upload and index readable PDF documents
@@ -353,6 +355,7 @@ git status --short --ignored
 - Scanned image-only PDFs are not OCR processed
 - Only one PDF is indexed at a time per implementation
 - Answer quality depends on retrieval quality and document content
+- AI-generated answers can still be inaccurate even when source passages are retrieved
 - Large PDFs require more indexing time and compute
 - IBM usage depends on service availability and token quota
 - Local Llama performance depends heavily on available hardware and whether Ollama uses CPU or GPU acceleration
