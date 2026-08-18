@@ -2,9 +2,35 @@
 
 This directory documents the manual validation performed for the **RAG PDF Question Answering Chatbot**.
 
+The repository contains two implementations:
+
+- IBM watsonx.ai + IBM Granite
+- Local Meta Llama + Ollama
+
 The project currently uses manual end-to-end testing rather than an automated test suite.
 
-## Test Environment
+No third-party sample PDF is bundled with the repository. Use your own readable, text-based PDF for testing.
+
+## Common Validation Areas
+
+Both implementations have been manually tested for:
+
+- PDF selection and validation
+- readable-page extraction
+- overlapping text chunk creation
+- vector embedding generation
+- Chroma indexing
+- semantic retrieval
+- grounded answer generation
+- source-page reporting
+- second-PDF replacement behavior
+- clear-chat behavior
+- full application reset
+- UI state management
+- serialized indexing and answer generation
+- user-friendly error handling
+
+## IBM watsonx.ai Test Environment
 
 Tested with:
 
@@ -16,41 +42,15 @@ Tested with:
 - Gradio
 - pypdf
 
-## Test 1: Pipeline End-to-End Validation
-
-Run:
-
-```bash
-python rag_pipeline.py
-```
-
-### Expected behavior
-
-- sample PDF loads successfully
-- readable pages are extracted
-- text chunks are created
-- IBM watsonx.ai embeddings are generated
-- Chroma stores the document chunks
-- semantic retrieval returns relevant passages
-- the Granite chat model generates a grounded answer
-- source pages are displayed
-
-Example test question:
+The IBM version requires valid values for:
 
 ```text
-What is Low-Rank Adaptation?
+WATSONX_APIKEY
+WATSONX_PROJECT_ID
+WATSONX_URL
 ```
 
-Successful test results included:
-
-```text
-Readable pages: 11
-Chunks indexed: 38
-```
-
-The generated answer was grounded in retrieved passages from the source PDF.
-
-## Test 2: Application Launch
+## IBM Application Launch
 
 Run:
 
@@ -58,138 +58,189 @@ Run:
 python app.py
 ```
 
-### Expected behavior
+Expected behavior:
 
 - Gradio starts successfully
-- the local interface is available at:
+- the interface is available at the local URL shown in the terminal
+- a PDF can be uploaded and indexed
+- questions can be asked after successful indexing
+- generated answers include source pages
+
+## IBM Pipeline Test
+
+The current IBM command-line test in `rag_pipeline.py` expects a local PDF at:
 
 ```text
-http://127.0.0.1:7860
+sample_docs/test.pdf
 ```
 
-## Test 3: PDF Upload and Indexing
+The repository intentionally does not include that PDF. To run the IBM CLI test, place your own readable PDF at that local path. Files matching `sample_docs/*.pdf` are ignored by Git.
 
-### Steps
+Then run:
 
-1. Open the Gradio interface.
-2. Upload a valid PDF.
-3. Click **Index PDF**.
-4. Wait for indexing to complete.
+```bash
+python rag_pipeline.py
+```
 
-### Expected behavior
+Expected behavior:
 
-- indexing status is displayed
-- controls are temporarily disabled during indexing
-- readable page count is displayed
-- chunk count is displayed
-- **Ask** becomes available after successful indexing
+- the PDF loads successfully
+- readable pages are extracted
+- chunks are created
+- IBM watsonx.ai embeddings are generated
+- Chroma stores the chunks
+- semantic retrieval returns passages
+- the Granite model generates a grounded answer
+- source pages are printed
 
-## Test 4: Question Answering
+## Local Llama Test Environment
 
-### Steps
+Tested with:
 
-1. Index a valid PDF.
-2. Enter a question about the document.
-3. Click **Ask** or press Enter.
+- Python 3.11
+- Ollama
+- Meta Llama `llama3.2`
+- `embeddinggemma`
+- LangChain
+- Chroma
+- Gradio
+- pypdf
 
-### Expected behavior
+Ollama must be running and the configured models must be installed.
 
-- relevant document chunks are retrieved
-- the IBM Granite chat model generates an answer
-- the answer is based only on retrieved document context
-- source pages are displayed below the answer
+## Local Llama Application Launch
 
-## Test 5: Blank Question
+Run:
 
-### Steps
+```bash
+python llama/app_llama.py
+```
 
-1. Index a valid PDF.
+Expected behavior:
+
+- Gradio starts successfully
+- a PDF can be uploaded and indexed locally
+- questions can be asked after successful indexing
+- answers are generated through Ollama
+- source pages are displayed
+
+## Local Llama Command-Line Test
+
+Supply your own readable PDF:
+
+```bash
+python llama/rag_pipeline_llama.py /path/to/document.pdf "What is this document about?"
+```
+
+Expected behavior:
+
+- the PDF loads successfully
+- readable pages are extracted
+- chunks are created
+- `embeddinggemma` generates embeddings through Ollama
+- Chroma indexes the chunks
+- Llama generates an answer grounded in retrieved context
+- source pages are printed
+
+## Broad Document Question Validation
+
+The local Llama implementation includes query-aware retrieval for broad document questions.
+
+Test examples:
+
+```text
+What is the purpose of this PDF?
+Summarize this article.
+What is this document about?
+```
+
+Expected behavior:
+
+- the broad-query path is detected
+- retrieval expands beyond the normal specific-question setting
+- introductory context from the beginning of the PDF is prioritized
+- the answer directly addresses the high-level question when the retrieved context supports it
+- source pages include relevant introductory pages when available
+
+## Specific Question Validation
+
+After indexing a PDF, ask a focused question about a clearly stated detail.
+
+Expected behavior:
+
+- normal similarity retrieval is used
+- the answer stays within the retrieved document context
+- source pages correspond to retrieved passages
+
+## Blank Question
+
+Steps:
+
+1. Index a PDF.
 2. Leave the question field blank.
 3. Attempt to submit.
 
-### Expected behavior
+Expected behavior:
 
-- no API request is made
 - no invalid response is added to the chat
+- no unnecessary model request is made
 
-## Test 6: Ask Before Indexing
+## Ask Before Indexing
 
-### Steps
+Steps:
 
-1. Launch the application.
+1. Launch either application.
 2. Do not index a PDF.
 3. Attempt to ask a question.
 
-### Expected behavior
+Expected behavior:
 
-- the **Ask** control remains disabled until a document is indexed
+- the Ask control remains unavailable until a document is indexed
 
-## Test 7: Invalid File Type
+## Invalid File Type
 
-### Steps
+Attempt to select a non-PDF file.
 
-1. Attempt to select a non-PDF file.
+Expected behavior:
 
-### Expected behavior
-
-- the application rejects unsupported file types
+- unsupported file types are rejected
 - only PDF documents are accepted
 
-## Test 8: PDF With No Readable Text
+## PDF With No Readable Text
 
 Use a PDF containing no extractable text.
 
-### Expected behavior
+Expected behavior:
 
 - indexing fails gracefully
 - the application reports that no readable text was found
 
-## Test 9: Second PDF Replaces First PDF
+## Second PDF Replaces First PDF
 
-### Steps
+Steps:
 
-1. Index the first PDF.
+1. Index a first PDF.
 2. Ask a question and verify the result.
 3. Index a second PDF.
 4. Ask a question related only to the first PDF.
 
-### Expected behavior
+Expected behavior:
 
-- the previous Chroma contents are reset
+- previous Chroma contents are reset
 - the second PDF becomes the active document
 - retrieval no longer uses chunks from the first PDF
 
-## Test 10: Race Condition Protection
+## Race Condition Protection
 
-### Steps
+While indexing or generating an answer, attempt to use conflicting controls.
 
-1. Upload a larger PDF.
-2. Click **Index PDF**.
-3. While indexing is running, attempt to use other controls.
+Expected behavior:
 
-### Expected behavior
+- conflicting controls are disabled during the active operation
+- indexing and answer generation remain serialized
+- the application does not execute overlapping RAG operations
 
-- **Ask** is disabled during indexing
-- **Reset** is disabled during indexing
-- **Clear Chat** is disabled during indexing
-- PDF selection is disabled during indexing
-- the question field is disabled during indexing
-- conflicting RAG operations do not execute at the same time
-
-## Test 11: Answer Generation Concurrency
-
-### Steps
-
-1. Index a PDF.
-2. Submit a question.
-3. Attempt to trigger another document or chat operation while the answer is being generated.
-
-### Expected behavior
-
-- conflicting controls remain disabled until answer generation finishes
-- retrieval and answer generation remain serialized through the Gradio event queue
-
-## Test 12: IBM watsonx.ai Token Quota Handling
+## IBM Token Quota Handling
 
 If IBM watsonx.ai returns a token quota error such as:
 
@@ -197,58 +248,53 @@ If IBM watsonx.ai returns a token quota error such as:
 token_quota_reached
 ```
 
-### Expected behavior
+Expected behavior:
 
-- the raw IBM traceback is not shown in the Gradio interface
+- the raw IBM traceback is not exposed in the Gradio interface
 - the UI displays a specific IBM watsonx.ai token quota warning
-- technical details remain available in the terminal logs
+- technical details remain available in terminal logs
 
-## Test 13: Clear Chat
+## Ollama Availability Handling
 
-### Steps
+Stop Ollama or use a configuration where a required local model is unavailable.
+
+Expected behavior:
+
+- the Gradio interface displays a user-friendly Ollama availability message
+- internal exception details remain in terminal logs for troubleshooting
+
+## Clear Chat
+
+Steps:
 
 1. Index a PDF.
 2. Ask one or more questions.
 3. Click **Clear Chat**.
 
-### Expected behavior
+Expected behavior:
 
 - chat history is cleared
-- the indexed PDF remains available
-- additional questions can still be asked without re-indexing
+- the indexed PDF remains active
+- additional questions can be asked without re-indexing
 
-## Test 14: Reset Application
+## Reset Application
 
-### Steps
+Steps:
 
 1. Index a PDF.
 2. Ask a question.
 3. Click **Reset**.
 
-### Expected behavior
+Expected behavior:
 
 - chat history is cleared
 - active retriever state is removed
 - uploaded PDF selection is cleared
-- **Ask** becomes disabled
+- Ask becomes disabled
 - the interface returns to its initial state
 
 ## Known Testing Limitations
 
-The current project does not include automated unit or integration tests.
+The project does not currently include automated unit or integration tests.
 
-Testing has primarily focused on:
-
-- PDF ingestion
-- text extraction
-- chunk creation
-- IBM embedding requests
-- Chroma indexing
-- semantic retrieval
-- answer generation
-- source reporting
-- UI state management
-- concurrency protection
-- error handling
-
-Automated tests may be added in a future version.
+Testing has primarily focused on manual end-to-end validation of ingestion, retrieval, generation, source reporting, UI state, concurrency protection, and error handling.
