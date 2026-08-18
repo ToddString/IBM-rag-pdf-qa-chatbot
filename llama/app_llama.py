@@ -10,7 +10,7 @@ from rag_pipeline_llama import (
 )
 
 
-APP_TITLE = "Local Llama RAG PDF Question Answering Chatbot"
+APP_TITLE = "Local Llama Retrieval-Augmented Generation (RAG) PDF Question Answering Chatbot"
 RAG_CONCURRENCY_ID = "llama_rag_operations"
 
 INITIAL_STATUS = (
