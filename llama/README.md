@@ -102,6 +102,22 @@ If the question is omitted, the default question is:
 What is this document about?
 ```
 
+## Broad Document Questions
+
+The local implementation includes query-aware retrieval for document-level questions such as summaries, purpose, overview, and main topic.
+
+Specific questions use the normal similarity retriever. Broad questions expand retrieval to include introductory-page context, the original user query, and an overview-oriented search. Retrieved chunks are deduplicated and introductory passages are placed first before generation.
+
+Examples of broad questions include:
+
+```text
+What is the purpose of this PDF?
+Summarize this article.
+What is this document about?
+```
+
+This behavior improves high-level answers while preserving the normal retrieval path for focused questions.
+
 ## PDF Size and Wait Time
 
 The larger the PDF, the longer the user should expect to wait for processing and answers. Longer documents usually create more text chunks, so the application has more content to extract, embed, index, search, and process before generating a response.
@@ -282,6 +298,6 @@ llama/
 - Larger PDFs generally require longer processing and answer times.
 - Model responses can vary from the IBM Granite implementation.
 
-## Development Status
+## Status
 
-This implementation is being developed on the `feature/llama-ollama` branch so it can be tested independently before being merged into `main`.
+The local Llama/Ollama implementation has completed end-to-end manual validation, including PDF indexing, grounded question answering, source-page reporting, broad document-purpose questions, article summarization, and GPU-accelerated Ollama inference.
