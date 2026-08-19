@@ -88,6 +88,24 @@ Then open the local Gradio URL shown in the terminal, normally:
 http://127.0.0.1:7860
 ```
 
+## Screenshots
+
+### Local Llama Application
+
+![Llama application home](screenshots/llama-app-home.png)
+
+### PDF Successfully Indexed
+
+![Llama PDF indexed](screenshots/llama-pdf-indexed.png)
+
+### Question Answering with Source Pages
+
+![Llama question answering](screenshots/llama-question-answer.png)
+
+### Ollama GPU Acceleration
+
+![Ollama GPU acceleration](screenshots/llama-ollama-gpu.png)
+
 ## Run the Command-Line Pipeline Test
 
 No third-party sample PDF is bundled with this implementation. Supply your own readable PDF:
@@ -283,7 +301,12 @@ llama/
 ├── app_llama.py
 ├── rag_pipeline_llama.py
 ├── requirements-llama.txt
-└── README.md
+├── README.md
+└── screenshots/
+    ├── llama-app-home.png
+    ├── llama-ollama-gpu.png
+    ├── llama-pdf-indexed.png
+    └── llama-question-answer.png
 ```
 
 ## Current Limitations
