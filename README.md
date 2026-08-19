@@ -325,7 +325,7 @@ When Ollama is running locally, PDF text, embeddings, retrieval, and answer gene
 
 ![Question answering with sources](screenshots/question-answer.png)
 
-Additional screenshots for the local implementation can be added under `screenshots/llama/`.
+Screenshots for the local Llama/Ollama implementation are available in [`llama/README.md`](llama/README.md).
 
 ## Security
 
